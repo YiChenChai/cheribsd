@@ -19,11 +19,11 @@ LIBTHR_SRCTOP:=	${.PARSEDIR}
 .endif
 .PATH: ${LIBTHR_SRCTOP}
 
-.ifdef CHERI_LIB_C18N
-SHLIB=thr
-.else
-LIB=thr
+.if ${MACHINE_ABI:Mpurecap} && ${MACHINE_CPUARCH} == "aarch64"
+SHARED_CFLAGS+=-DCHERI_LIB_C18N
 .endif
+
+LIB=thr
 SHLIB_MAJOR= 3
 
 NO_WTHREAD_SAFETY=1
@@ -52,7 +52,8 @@ CFLAGS.thr_symbols.c+=	-Wno-missing-variable-declarations
 CFLAGS.thr_sig.c+=	-fno-sanitize=address
 .endif
 
-.if ${MACHINE_CPUARCH} == "arm"
+.if ${MACHINE_CPUARCH} == "arm" || defined(CHERI_LIB_C18N)
+# XXX: CHERI_LIB_C18N currently does not support stack unwinding.
 NO_THREAD_UNWIND_STACK= yes
 .endif
 
@@ -67,9 +68,7 @@ LDFLAGS+=-Wl,--auxiliary,libsys.so.7
 VERSION_DEF=${SRCTOP}/lib/libc/Versions.def
 SYMBOL_MAPS=${LIBTHR_SRCTOP}/pthread.map
 
-.ifndef CHERI_LIB_C18N
 MAN=	libthr.3
-.endif
 
 .if ${MK_PTHREADS_ASSERTIONS} != "no"
 # enable extra internal consistency checks
@@ -106,7 +105,6 @@ LIBSYS_SRCTOP=	${LIBTHR_SRCTOP:H}/libsys
 .endif
 OBJS+=	_umtx_op_err.o
 
-.ifndef CHERI_LIB_C18N
 .if ${MK_INSTALLLIB} != "no"
 SYMLINKS+=lib${LIB}.a ${LIBDIR}/libpthread.a
 .endif
@@ -119,6 +117,5 @@ SYMLINKS+=lib${LIB}_p.a ${LIBDIR}/libpthread_p.a
 
 HAS_TESTS=
 SUBDIR.${MK_TESTS}+= tests
-.endif
 
 .include <bsd.lib.mk>
