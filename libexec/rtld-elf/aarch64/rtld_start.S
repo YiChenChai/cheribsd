@@ -119,25 +119,7 @@ END(.rtld_start)
  */
 ENTRY(C18N_SYM(_rtld_bind_start))
 #ifdef CHERI_LIB_C18N
-	/*
-	 * Get the caller's current stack top.
-	 */
-	get_untrusted_stk	c10
-	/*
-	 * Update the stack lookup table with the caller's current stack top and
-	 * get the caller's old stack top.
-	 */
-	update_stk_table	c11, c10, w12
-	/*
-	 * Switch to RTLD's stack.
-	 */
-	get_rtld_stk		c12
-	set_untrusted_stk	c12
-	/*
-	 * Save caller's old stack top.
-	 */
-	str	c11, [csp, #-CAP_WIDTH]!
-	mov	c17, c10
+	get_untrusted_stk	c17
 #else
 	mov	PTR(17), PTRN(sp)
 #endif
@@ -185,7 +167,16 @@ ENTRY(C18N_SYM(_rtld_bind_start))
 	ldr	PTR(0), [PTR(16), #-PTR_WIDTH]
 
 	/* Call into rtld */
+#ifdef CHERI_LIB_C18N
+	ldr	c10, c18n_rtld_bind
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	blr	x10
+#else
+	blr	c10
+#endif
+#else
 	bl	_rtld_bind
+#endif
 
 	/* Backup the address to branch to */
 	mov	PTR(16), PTR(0)
@@ -204,41 +195,12 @@ ENTRY(C18N_SYM(_rtld_bind_start))
 	/* Restore frame pointer */
 	ldp	PTR(29), PTR(zr), [PTRN(sp)], #(PTR_WIDTH * 2)
 
-#ifdef CHERI_LIB_C18N
-	/*
-	 * Load caller's old stack top.
-	 */
-	ldr	c10, [csp], #CAP_WIDTH
-	/*
-	 * Update the stack lookup table with the caller's old stack top and get
-	 * the caller's current stack top.
-	 */
-	update_stk_table	c11, c10, w12
-	/*
-	 * Pop the return address saved by the PLT.
-	 */
-	ldp	czr, c30, [c11], #(PTR_WIDTH * 2)
-	/*
-	 * Switch to caller's stack.
-	 */
-	set_untrusted_stk	c11
-
-	/*
-	 * Clear temporary registers that might contain RTLD-privileged
-	 * capabilities. Typically, the resolver returns a trampoline which will
-	 * clear them, but if the resolved function is trusted, then no such
-	 * clearing would be performed.
-	 */
-	mov	x13, xzr
-	mov	x14, xzr
-	mov	x15, xzr
-	/*
-	 * c16: Callee's code
-	 */
-	mov	x17, xzr
-	mov	x18, xzr
-#else
 	/* Restore link register saved by the plt code */
+#ifdef CHERI_LIB_C18N
+	get_untrusted_stk	c17
+	ldp	czr, c30, [c17], #(PTR_WIDTH * 2)
+	set_untrusted_stk	c17
+#else
 	ldp	PTR(zr), PTR(30), [PTRN(sp)], #(PTR_WIDTH * 2)
 #endif
 
@@ -368,27 +330,6 @@ ENTRY(C18N_SYM(_rtld_tlsdesc_dynamic))
 	stp	c15, c16, [csp, #(7 * 32)]
 	stp	c17, c18, [csp, #(8 * 32)]
 	str	c19,	  [csp, #(9 * 32)]
-#ifdef CHERI_LIB_C18N
-	/*
-	 * Get the caller's current stack top. This step is only needed for
-	 * _rtld_tlsdesc_dynamic because it might call external functions.
-	 */
-	get_untrusted_stk	c10
-	/*
-	 * Update the stack lookup table with the caller's current stack top and
-	 * get the caller's old stack top.
-	 */
-	update_stk_table	c11, c10, w12
-	/*
-	 * Switch to RTLD's stack.
-	 */
-	get_rtld_stk		c10
-	set_untrusted_stk	c10
-	/*
-	 * Save caller's old stack top.
-	 */
-	str	c11, [csp, #-CAP_WIDTH]!
-#endif
 	.cfi_rel_offset		 c1, 32
 	.cfi_rel_offset		 c2, 48
 	.cfi_rel_offset		 c5, 64
@@ -413,25 +354,19 @@ ENTRY(C18N_SYM(_rtld_tlsdesc_dynamic))
 	ldr	w1, [c3, #16]		/* tlsdesc->tls_index */
 	ldr	x2, [c3, #24]		/* tlsdesc->tls_offs */
 	ldr	x19, [c3, #32]		/* tlsdesc->tls_size */
+#ifdef CHERI_LIB_C18N
+	ldr	c10, c18n_tls_get_addr_common
+#ifdef __ARM_MORELLO_PURECAP_BENCHMARK_ABI
+	blr	x10
+#else
+	blr	c10
+#endif
+#else
 	bl	tls_get_addr_common
+#endif
 	scbnds	c0, c0, x19
 
 	/* Restore slow path registers */
-#ifdef CHERI_LIB_C18N
-	/*
-	 * Load caller's old stack top.
-	 */
-	ldr	c10, [csp], #CAP_WIDTH
-	/*
-	 * Update the stack lookup table with the caller's old stack top and get
-	 * the caller's current stack top.
-	 */
-	update_stk_table	c11, c10, w12
-	/*
-	 * Switch to caller's stack.
-	 */
-	set_untrusted_stk	c11
-#endif
 	ldr	c19,	  [csp, #(9 * 32)]
 	ldp	c17, c18, [csp, #(8 * 32)]
 	ldp	c15, c16, [csp, #(7 * 32)]

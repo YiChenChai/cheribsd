@@ -1205,13 +1205,10 @@ _rtld_bind(Plt_Entry *plt, Elf_Size reloff)
     uintptr_t *where;
     uintptr_t target;
     RtldLockState lockstate;
-#ifdef CHERI_LIB_C18N
-    struct trusted_frame *tf;
 
-    if (C18N_ENABLED) {
+#ifdef CHERI_LIB_C18N
+    if (C18N_ENABLED)
 	plt = cheri_unseal(plt, sealer_pltgot);
-	tf = push_dummy_rtld_trusted_frame(get_trusted_stk());
-    }
 #endif
 
     obj = plt->obj;
@@ -1262,10 +1259,6 @@ _rtld_bind(Plt_Entry *plt, Elf_Size reloff)
      */
     target = reloc_jmpslot(where, target, defobj, obj, rel);
     lock_release(rtld_bind_lock, &lockstate);
-#ifdef CHERI_LIB_C18N
-    if (C18N_ENABLED)
-	tf = pop_dummy_rtld_trusted_frame(tf);
-#endif
     return (target);
 }
 
@@ -5894,26 +5887,13 @@ void *
 tls_get_addr_common(uintptr_t **dtvp, int index, size_t offset)
 {
 	uintptr_t *dtv;
-	void *ret;
 
 	dtv = *dtvp;
 	/* Check dtv generation in case new modules have arrived */
 	if (__predict_true(dtv[0] == tls_dtv_generation &&
 	    dtv[index + 1] != 0))
 		return ((void *)(dtv[index + 1] + offset));
-
-#ifdef CHERI_LIB_C18N
-	struct trusted_frame *tf;
-
-	if (C18N_ENABLED)
-		tf = push_dummy_rtld_trusted_frame(get_trusted_stk());
-#endif
-	ret = tls_get_addr_slow(dtvp, index, offset, false);
-#ifdef CHERI_LIB_C18N
-	if (C18N_ENABLED)
-		tf = pop_dummy_rtld_trusted_frame(tf);
-#endif
-	return (ret);
+	return (tls_get_addr_slow(dtvp, index, offset, false));
 }
 
 #ifdef TLS_VARIANT_I

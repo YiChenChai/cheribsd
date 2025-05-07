@@ -167,29 +167,6 @@ struct tcb *c18n_allocate_tcb(struct tcb *);
 void c18n_free_tcb(void);
 
 /*
- * When entering the RTLD without a trampoline (e.g., during lazy binding, TLS
- * lookup, or stack resolution), a dummy trusted frame indicating that the
- * current compartment is RTLD must be pushed.
- */
-static inline struct trusted_frame *
-push_dummy_rtld_trusted_frame(struct trusted_frame *tf)
-{
-	*--tf = (struct trusted_frame) {
-		.callee = cid_to_index(RTLD_COMPART_ID)
-	};
-	set_trusted_stk(tf);
-	return (tf);
-}
-
-static inline struct trusted_frame *
-pop_dummy_rtld_trusted_frame(struct trusted_frame *tf)
-{
-	assert(get_trusted_stk() == tf);
-	set_trusted_stk(++tf);
-	return (tf);
-}
-
-/*
  * Stack unwinding
  */
 int c18n_is_tramp(uintptr_t, const struct trusted_frame *);
